@@ -1,0 +1,22 @@
+{
+  "name": "codex-review",
+  "owner": {
+    "name": "Spencer"
+  },
+  "metadata": {
+    "description": "Adversarial review skills using OpenAI Codex CLI",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "codex-review-skills",
+      "description": "Adversarial review skills that use OpenAI Codex as a second reviewer. Includes concept/design review and code review.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/codex-review",
+        "./skills/codex-code-review"
+      ]
+    }
+  ]
+}
