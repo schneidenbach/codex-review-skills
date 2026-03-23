@@ -2,7 +2,7 @@
 name: codex-code-review
 description: >
   Use when reviewing code changes for bugs, security issues, and code quality using OpenAI Codex as an adversarial reviewer. Tell it where to find the code.
-argument-hint: [target] [focus area]
+argument-hint: "target, focus area"
 allowed-tools: Bash, Read, Grep, Glob
 ---
 
