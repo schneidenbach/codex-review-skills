@@ -34,6 +34,7 @@ npm install -g @openai/codex
 
 ### As a Claude Code plugin
 ```
+/plugin marketplace add https://github.com/schneidenbach/codex-review-skills
 /plugin install codex-review-skills@codex-review
 ```
 
