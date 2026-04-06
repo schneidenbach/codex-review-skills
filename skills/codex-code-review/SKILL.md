@@ -49,20 +49,25 @@ Run `which codex`. If not found, stop and report: "The codex CLI is not installe
 
 For non-file review modes, verify you're in a git repo with `git rev-parse --git-dir`.
 
-## Step 3: Generate the diff
+## Step 3: Determine the review target
 
-- **Uncommitted changes**: `git diff HEAD`. Also check for untracked files with `git ls-files --others --exclude-standard` and generate unified diffs for them.
-- **Branch diff**: Find the merge base with `git merge-base HEAD "$BRANCH"`, then `git diff "$MERGE_BASE"..HEAD`.
-- **Commit**: `git show "$SHA" --format="" --patch`
-- **File paths**: No diff needed. Read each file directly.
+Figure out what Codex needs to review based on the user's request. Don't generate diffs or read file contents yourself — Codex has full filesystem access and can do this itself. Your job is to describe the target clearly so Codex knows where to look.
 
-If no changes exist, report: "No uncommitted changes found."
+- **Uncommitted changes**: Quick-check with `git status` that there are actually changes. If none, report: "No uncommitted changes found." The target description for Codex is: "uncommitted changes (staged and unstaged) in `<absolute repo path>`".
+- **Branch diff**: Verify the branch exists with `git rev-parse`. The target description is: "changes on the current branch compared to `<branch>` in `<absolute repo path>`".
+- **Commit**: Verify the SHA exists. The target description is: "the changes introduced by commit `<SHA>` in `<absolute repo path>`".
+- **File paths**: Verify the files exist. The target description is: "the files `<absolute paths>`".
 
-If the diff exceeds 100KB, truncate at a hunk boundary and warn the user.
+Resolve all paths to absolute. You'll pass this target description to Codex in the next step.
 
 ## Step 4: Get initial review from Codex
 
-Call `codex exec --full-auto` with a prompt asking Codex to review the diff/files. For large diffs, pipe via stdin using `-` to avoid ARG_MAX limits. Add `--skip-git-repo-check` when not in a git repo.
+Call `codex exec --full-auto` with a prompt that tells Codex what to review by description — never paste diffs, file contents, or code into the prompt. Codex has full filesystem access and can read files and run git commands itself. Treat it like a colleague you're pointing at the right code, not a function you're feeding data to.
+
+Your prompt to Codex should include:
+- The target description from Step 3 (e.g., "Review uncommitted changes in /path/to/repo")
+- The absolute path to the repo so Codex can navigate to it
+- Any user-specified focus areas
 
 The Codex prompt should ask for findings across: bugs, security vulnerabilities, race conditions, error handling gaps, and performance problems.
 
@@ -99,7 +104,7 @@ For each debate candidate, run up to 5 rounds:
 2. Form your own assessment: real issue, false positive, or overstated?
 3. Build a challenge or agreement with specific code evidence
 
-**Codex's turn:** Call `codex exec` with your challenge. Ask Codex to respond with DEFEND, RETRACT, or REVISE.
+**Codex's turn:** Call `codex exec` with your challenge. Describe the file and line range Codex should examine — don't paste code into the prompt. Codex can read the source files itself. Ask Codex to respond with DEFEND, RETRACT, or REVISE.
 
 ### Convergence rules
 
@@ -151,7 +156,7 @@ Omit empty sections. If no findings at all: "Both reviewers agree: no significan
 ## Gotchas
 
 - `codex exec` outputs to stdout. No need for temp files or `-o` flag. Just call it and read the output.
-- For large prompts (over ~100KB), pipe via stdin: `echo "$PROMPT" | codex exec --full-auto -`
+- Never pass diffs, file contents, or code blocks in the Codex prompt. Codex has filesystem access — tell it where to look, not what the code says.
 - If Codex fails or times out, fall back to a Claude-only review. Do not silently swallow errors.
 - When reviewing files in a different directory, resolve all paths to absolute before cd'ing.
 - Always quote user-provided values in shell commands to prevent injection.
