@@ -1,8 +1,13 @@
-# Codex Review Skills
+# Adversarial Review Skills
 
-Adversarial review skills for Claude Code that use OpenAI Codex CLI as a second reviewer.
+Adversarial review skills that pair Claude Code and OpenAI Codex against each other. The pair runs in either direction:
 
-## Skills
+- **Claude-side skills** (`codex-review`, `codex-code-review`) run inside Claude Code and call Codex as the second reviewer.
+- **Codex-side skills** (`claude-review`, `claude-code-review`) run inside Codex and call Claude as the second reviewer.
+
+Pick the side that matches whichever agent is driving the session.
+
+## Claude-side skills (driven by Claude Code, second opinion from Codex)
 
 ### codex-review
 Debate the merits of an idea, architecture, approach, or design decision. Claude and Codex take turns critiquing and defending concerns until they converge on what's real and what's noise.
@@ -22,36 +27,61 @@ Review code changes for bugs, security issues, and quality problems. Codex flags
 /codex-code-review deep review of branch main
 ```
 
+## Codex-side skills (driven by Codex, second opinion from Claude)
+
+### claude-review
+Mirror of `codex-review`, but driven by Codex. Codex critiques the concept, calls `claude -p` for an adversarial second pass, then debates each concern with Claude until convergence.
+
+```
+/claude-review We plan to use event sourcing with Redis as the event store
+/claude-review docs/architecture-rfc.md
+/claude-review deep review of our caching strategy docs/cache.md
+```
+
+### claude-code-review
+Mirror of `codex-code-review`, but driven by Codex. Codex generates the diff, calls `claude -p` for findings, and debates each finding with Claude.
+
+```
+/claude-code-review
+/claude-code-review src/auth.ts src/api/handler.ts
+/claude-code-review deep review of branch main
+```
+
 ## Prerequisites
 
-Requires the [OpenAI Codex CLI](https://github.com/openai/codex):
+The Claude-side skills need the [OpenAI Codex CLI](https://github.com/openai/codex):
 
 ```bash
 npm install -g @openai/codex
 ```
 
+The Codex-side skills need the [Claude Code CLI](https://claude.com/claude-code).
+
+If you want both directions, install both CLIs.
+
 ## Install
 
-### As a Claude Code plugin
+### Claude-side skills (Claude Code)
 ```
 /plugin marketplace add https://github.com/schneidenbach/codex-review-skills
 /plugin install codex-review-skills@codex-review
 ```
 
-### As personal skills
-Copy the skill folders to `~/.claude/skills/`:
-```bash
-cp -r skills/codex-review ~/.claude/skills/
-cp -r skills/codex-code-review ~/.claude/skills/
-```
+### Codex-side skills (Codex)
+Codex loads user-installed skills from `~/.codex/skills/<skill-name>/SKILL.md` — one flat directory per skill at the top level. Inside Codex, ask its built-in `skill-installer` to install from this repo:
+
+> Install skills from `schneidenbach/codex-review-skills`, paths `skills/claude-review` and `skills/claude-code-review`.
+
+Restart Codex afterward to pick up the new skills.
 
 ## How it works
 
-Both skills follow the same adversarial pattern:
+All four skills follow the same adversarial pattern:
 
-1. Send code or concept to Codex for initial review
-2. Triage findings by severity
-3. Claude reads the source material and challenges each finding
-4. Codex defends, retracts, or revises
-5. Repeat until convergence (max 5 rounds per finding)
-6. Produce a structured report with confirmed issues, unresolved disagreements, and observations
+1. The driver (Claude or Codex) gathers the code or concept
+2. The second reviewer (Codex or Claude) returns initial findings or concerns
+3. Triage by severity
+4. The driver reads the source material and challenges each finding
+5. The second reviewer defends, retracts, or revises
+6. Repeat until convergence (max 5 rounds per finding)
+7. Produce a structured report with confirmed issues, unresolved disagreements, and observations
