@@ -37,7 +37,7 @@ Read the arguments the user provided. They may include:
 - Depth preference (words like "quick", "deep", "thorough")
 - Focus areas (e.g. "focus on backwards compatibility")
 
-If file paths are provided, read them. Combine everything into a self-contained concept description that Codex can evaluate without file access.
+If file paths are provided, note them — you'll tell Codex which files to read. Codex has full filesystem access, so don't read files and paste their contents into the prompt. Instead, describe the concept and point Codex at the relevant files by their absolute paths.
 
 If no concept was provided at all, ask: "No concept provided. Pass a description, file paths, or both."
 
@@ -47,7 +47,7 @@ Run `which codex`. If not found, stop and report: "The codex CLI is not installe
 
 ## Step 3: Get initial critique from Codex
 
-Call `codex exec` with a prompt asking Codex to critique the concept. Use `--full-auto --skip-git-repo-check`. For large prompts, pipe via stdin using `-` to avoid ARG_MAX limits.
+Call `codex exec` with a prompt asking Codex to critique the concept. Use `--full-auto --skip-git-repo-check`. Describe the concept and tell Codex which files to read for context — never paste file contents or code into the prompt. Codex can read the files itself.
 
 The Codex prompt should ask for critiques across: feasibility, scalability, security, correctness, complexity, operations, and assumptions.
 
@@ -142,7 +142,7 @@ Omit empty sections. If no concerns at all: "Both reviewers agree: the concept a
 ## Gotchas
 
 - `codex exec` outputs to stdout. No need for temp files or `-o` flag. Just call it and read the output.
-- For large prompts (over ~100KB), pipe via stdin: `echo "$PROMPT" | codex exec --full-auto --skip-git-repo-check -`
+- Never pass file contents, code blocks, or large text dumps in the Codex prompt. Codex has filesystem access — point it at the files by path and let it read them.
 - If Codex fails or times out, fall back to a Claude-only review. Do not silently swallow errors.
 - Codex saying "looks sound" is not proof the concept is sound. Always stress-test with your own critique.
 
