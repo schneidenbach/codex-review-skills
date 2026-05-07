@@ -44,7 +44,7 @@ Read the arguments the user provided. They may include:
 - Depth preference (words like "quick", "deep", "thorough")
 - Focus areas (e.g. "focus on SQL injection")
 
-Interpret these naturally. If a token looks like a file path, check if it exists. If it looks like a branch, check with git. If it looks like a directory, cd into it. If it looks like a PR number or GitHub PR URL, use `gh pr diff <number>` to get the diff. If something doesn't resolve to anything (not a file, directory, branch, commit SHA, or PR), tell the user: "Could not resolve '<token>': not a file, directory, branch, commit SHA, or PR number."
+Interpret these naturally. If a token looks like a file path, check if it exists. If it looks like a branch, check with git. If it looks like a directory, cd into it. If it looks like a PR number or GitHub PR URL, verify with `gh pr view <number> --json number` (don't fetch the diff — Claude will run `gh pr diff` itself). If something doesn't resolve to anything (not a file, directory, branch, commit SHA, or PR), tell the user: "Could not resolve '<token>': not a file, directory, branch, commit SHA, or PR number."
 
 If no target is specified, review uncommitted changes in the current working directory.
 
@@ -54,23 +54,23 @@ Run `which claude`. If not found, stop and report: "The Claude Code CLI is not i
 
 For non-file review modes, verify you're in a git repo with `git rev-parse --git-dir`.
 
-## Step 3: Generate the diff
+## Step 3: Determine the review target
 
-- **Uncommitted changes**: `git diff HEAD`. Also check for untracked files with `git ls-files --others --exclude-standard` and generate unified diffs for them.
-- **Branch diff**: Find the merge base with `git merge-base HEAD "$BRANCH"`, then `git diff "$MERGE_BASE"..HEAD`.
-- **Commit**: `git show "$SHA" --format="" --patch`
-- **PR**: `gh pr diff "$PR_NUMBER"`
-- **File paths**: No diff needed. Read each file directly.
+Figure out what Claude needs to review based on the user's request. Don't generate diffs or read file contents yourself — Claude Code has full filesystem and shell access and can do this itself. Your job is to describe the target clearly so Claude knows where to look.
 
-If no changes exist, report: "No uncommitted changes found."
+- **Uncommitted changes**: Quick-check with `git status` that there are actually changes. If none, report: "No uncommitted changes found." The target description for Claude is: "uncommitted tracked changes (staged and unstaged) and any untracked files in `<absolute repo path>`".
+- **Branch diff**: Verify the branch exists with `git rev-parse`. The target description is: "changes on the current branch compared to `<branch>` in `<absolute repo path>`".
+- **Commit**: Verify the SHA exists. The target description is: "the changes introduced by commit `<SHA>` in `<absolute repo path>`".
+- **PR**: Verify the PR exists with `gh pr view`. The target description is: "the changes in PR `#<N>` — Claude should run `gh pr diff <N>` to see the diff — checked out in `<absolute repo path>`".
+- **File paths**: Verify the files exist. The target description is: "the files `<absolute paths>`".
 
-If the diff exceeds 100KB, split at a hunk boundary. Review the first chunk and warn the user that the diff was truncated.
+Resolve all paths to absolute. You'll pass this target description to Claude in the next step. Don't embed shell commands containing user-controlled values like branch names — branch names can contain `&`, `|`, `>`, and other metacharacters that git accepts but a shell would interpret. Describe the target in plain prose; the prompt template tells Claude which git commands fit each target.
 
 ## Step 4: Get initial review from Claude
 
-Read `references/prompt-template.md` for the exact prompt format and output parsing guidance.
+Read `references/prompt-template.md` for the exact prompt format and output parsing guidance. The prompt tells Claude what to review by description — never paste diffs, file contents, or code into the prompt. Claude reads the files and runs git commands itself.
 
-Call `claude -p` (print mode, non-interactive) with the review prompt. Claude receives the diff via the prompt, so it doesn't need repo access. Pipe via stdin using heredoc syntax to avoid ARG_MAX limits and shell interpretation of code content:
+Call `claude -p` (print mode, non-interactive) with the review prompt. Pipe via stdin using heredoc syntax:
 
 ```bash
 claude -p <<'CLAUDE_PROMPT'
@@ -106,7 +106,7 @@ If Claude truly fails per the criteria above, stop and tell the user: `Claude fa
 
 **Output validation:** Verify the output contains either `NO_ISSUES_FOUND` or at least one `FINDING:` marker (case-insensitive). See the prompt template reference for parsing guidance when output doesn't match exactly.
 
-**If Claude returned `NO_ISSUES_FOUND`**, do NOT stop. Proceed to Step 6 for the reversed-role debate.
+**If Claude returned `NO_ISSUES_FOUND`**: in Deep or Auto mode, do NOT stop — proceed to Step 6 for the reversed-role debate. In Quick mode, report clean and stop (Quick is single-pass by definition).
 
 ## Step 5: Triage findings by depth mode
 
@@ -123,7 +123,9 @@ For each debate candidate:
 2. Verify the line number is correct by matching the EVIDENCE quote against the source. If the line number is wrong, find the correct line and use that instead.
 3. Follow the debate protocol: challenge with specific code evidence, let Claude respond, iterate until convergence or 5 rounds.
 
-**When Claude returned NO_ISSUES_FOUND**, run the reversed-role debate: independently scan the diff for issues Claude missed. Generate 2-3 findings of your own and present them to Claude for defense.
+**Claude's turn:** Call `claude -p` with your challenge. Describe the file and line range Claude should examine — don't paste code into the prompt. Claude can read the source files itself. Ask Claude to respond with DEFEND, RETRACT, or REVISE.
+
+**When Claude returned NO_ISSUES_FOUND**, run the reversed-role debate: independently scan the changes for issues Claude missed. Generate 2-3 findings of your own and present them to Claude for defense.
 
 Independent debate rounds (different findings) can be run in parallel where the runtime supports it (e.g., spawning multiple `claude -p` shells concurrently) to reduce wall-clock time.
 
@@ -166,6 +168,13 @@ Findings: <X confirmed, Y unresolved, Z dismissed>
 ```
 
 Omit empty sections. If no findings at all: "Both reviewers agree: no significant issues found."
+
+## Gotchas
+
+- `claude -p` outputs to stdout. Just call it and read the output.
+- Never pass diffs, file contents, or code blocks in the Claude prompt. Claude has filesystem and shell access — tell it where to look (a git command, an absolute path), not what the code says.
+- When reviewing files in a different directory, resolve all paths to absolute before invoking Claude.
+- Always quote user-provided values in shell commands to prevent injection.
 
 ## Example invocations
 

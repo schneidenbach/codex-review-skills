@@ -41,7 +41,7 @@ Read the arguments the user provided. They may include:
 - Depth preference (words like "quick", "deep", "thorough")
 - Focus areas (e.g. "focus on backwards compatibility")
 
-If file paths are provided, read them. Combine everything into a self-contained concept description that Claude can evaluate without file access.
+If file paths are provided, note them — you'll tell Claude which files to read. Claude Code has full filesystem access, so don't read files and paste their contents into the prompt. Instead, describe the concept and point Claude at the relevant files by their absolute paths. The same goes for branch state, commits, and PRs: describe the target (e.g. "the design described inline plus the schema in `<abs path>` and the changes on this branch versus origin/dev — diff with `git diff origin/dev...HEAD`") rather than dumping the contents.
 
 If no concept was provided at all, ask: "No concept provided. Pass a description, file paths, or both."
 
@@ -51,7 +51,7 @@ Run `which claude`. If not found, stop and report: "The Claude Code CLI is not i
 
 ## Step 3: Get initial critique from Claude
 
-Read `references/prompt-template.md` for the exact prompt format and output parsing guidance.
+Read `references/prompt-template.md` for the exact prompt format and output parsing guidance. The prompt describes the concept and tells Claude which files to read for context — never paste file contents or code into the prompt. Claude can read the files itself.
 
 Call `claude -p` (print mode, non-interactive) with the critique prompt. Pipe via stdin using heredoc syntax to avoid ARG_MAX limits and shell injection:
 
@@ -89,7 +89,7 @@ If Claude truly fails per the criteria above, stop and tell the user: `Claude fa
 
 **Output validation:** Verify the output contains either `CONCEPT_LOOKS_SOUND` or at least one `CONCERN:` marker (case-insensitive). See the prompt template reference for parsing guidance when Claude output doesn't match the expected format exactly.
 
-**If Claude returned CONCEPT_LOOKS_SOUND**, do NOT stop. Proceed to Step 5 for the reversed-role debate.
+**If Claude returned CONCEPT_LOOKS_SOUND**: in Deep or Auto mode, do NOT stop — proceed to Step 5 for the reversed-role debate. In Quick mode, report sound and stop (Quick is single-pass by definition).
 
 ## Step 4: Triage concerns by depth mode
 
@@ -143,6 +143,12 @@ Outcome: <X confirmed, Y unresolved, Z dismissed>
 ```
 
 Omit empty sections. If no concerns at all: "Both reviewers agree: the concept appears sound."
+
+## Gotchas
+
+- `claude -p` outputs to stdout. Just call it and read the output.
+- Never pass file contents, code blocks, or large text dumps in the Claude prompt. Claude has filesystem and shell access — point it at the files by absolute path (or give it a git command) and let it read them.
+- Claude saying "looks sound" is not proof the concept is sound. Always stress-test with your own critique.
 
 ## Example invocations
 

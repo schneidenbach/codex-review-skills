@@ -2,13 +2,15 @@
 
 ## Initial review prompt
 
-Use this template for the Step 4 call to Claude. Replace placeholders in angle brackets.
+Use this template for the Step 4 call to Claude. Replace placeholders in angle brackets. Never paste diffs, file contents, or code into the prompt — point Claude at the target by description and let it read the files itself.
 
 ```
 You are an adversarial code reviewer. Review the following code changes and identify potential issues. Your reviewer counterpart (Codex) will challenge your findings, so cite specific evidence.
 
-CODE:
-<the diff or file content>
+REPO: <absolute path to repo>
+TARGET: <target description from Step 3, e.g., "uncommitted tracked changes (staged and unstaged) and any untracked files" or "the changes introduced by commit abc1234" or "the files /abs/path/a.ts /abs/path/b.ts">
+
+Use git, the filesystem, and shell access to read the relevant code yourself. For tracked diffs, run `git diff HEAD`, `git show <SHA>`, `git diff <merge-base>..HEAD`, or similar as appropriate. For untracked files, list them with `git ls-files --others --exclude-standard` and then read each one directly. For file targets, read the files directly. Do not ask the user to paste anything.
 
 FOCUS AREAS: <user-specified focus areas, or "none specified" if absent>
 
@@ -22,7 +24,7 @@ Look for:
 For each finding, use this exact format:
 
 FINDING: <short title>
-FILE: <file path>
+FILE: <absolute file path>
 LINE: <source file line number, NOT the diff offset>
 SEVERITY: critical | warning | info
 EVIDENCE: <quote the specific code>
@@ -38,23 +40,21 @@ Do not add preamble or commentary outside of this format.
 
 ## Debate challenge prompt
 
-Use this when challenging a Claude finding in the debate loop.
+Use this when challenging a Claude finding in the debate loop. Don't paste source code into the prompt — Claude can read the file itself.
 
 ```
 You previously flagged this issue in a code review:
 
 FINDING: <title>
-FILE: <file>
+FILE: <absolute file path>
 LINE: <line>
 SEVERITY: <severity>
 EVIDENCE: <code quote>
 REASONING: <original reasoning>
 
-I read the source file. Here is the actual code with context (lines <start>-<end>):
+Re-read <file> around line <line> (20-30 lines of context). Here is my challenge:
 
-<code context from source file>
-
-<Codex's challenge with specific evidence>
+<Codex's challenge with specific evidence — describe what you saw in the file, don't paste the code>
 
 Based on this challenge, respond with exactly one of:
 - DEFEND: <maintain your position with additional evidence>
@@ -64,18 +64,15 @@ Based on this challenge, respond with exactly one of:
 
 ## Reversed-role challenge prompt
 
-Use when Claude found no issues and Codex is stress-testing.
+Use when Claude found no issues and Codex is stress-testing. Point Claude back at the target — don't paste the diff.
 
 ```
-You reviewed these code changes and found no issues (NO_ISSUES_FOUND).
+You reviewed the changes in <repo path> (<target description>) and found no issues (NO_ISSUES_FOUND).
 
-Here is the diff again:
-<diff content>
-
-I believe there is a potential issue:
+Re-examine the changes. I believe there is a potential issue:
 
 FINDING: <Codex's finding title>
-FILE: <file>
+FILE: <absolute file path>
 LINE: <line>
 SEVERITY: <severity>
 EVIDENCE: <code quote>
