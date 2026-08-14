@@ -1,5 +1,7 @@
 # Adversarial Review Skills
 
+**This repository is retired. Development has moved to [schneidenbach/skills](https://github.com/schneidenbach/skills).**
+
 Adversarial review skills that pair Claude Code and OpenAI Codex against each other. The pair runs in either direction:
 
 - **Claude-side skills** (`codex-review`, `codex-code-review`) run inside Claude Code and call Codex as the second reviewer.
